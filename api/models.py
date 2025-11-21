@@ -38,3 +38,28 @@ class Category(TimeStamp):
 
     def __str__(self):
         return f'{self.user} {self.category_type}: {self.name}'
+
+class Transaction(TimeStamp):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='transactions')
+    amount = models.PositiveIntegerField(default=0, help_text='واحد پیش‌فرض (ریال)')
+    description = models.TextField(blank=True, null=True)
+    transaction_date = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'{self.category.name}: {self.amount}'
+
+class Budgeting(TimeStamp):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='category_budget')
+    minimum_target_amount = models.PositiveIntegerField(default=0, help_text='واحد پیش‌فرض (ریال)')
+    maximum_target_amount = models.PositiveIntegerField(default=0, help_text='واحد پیش‌فرض (ریال)')
+    start_date = models.DateField()
+    end_date = models.DateField()
+
+    class Meta(TimeStamp.Meta):
+        ordering = ['-start_date']
+        unique_together = ('user', 'category', 'start_date', 'end_date')
