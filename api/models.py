@@ -27,7 +27,7 @@ class Category(TimeStamp):
         ('خاکستری', '#AAB8C2')
     )
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='categories')
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     category_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='expense')
     color = models.CharField(max_length=100, choices=COLORS, default='Gray')
     default_amount = models.PositiveIntegerField(default=0, null=True, blank=True, help_text='واحد پیش ‌فرض (ریال)')
@@ -35,6 +35,7 @@ class Category(TimeStamp):
 
     class Meta(TimeStamp.Meta):
         ordering = ['name']
+        unique_together = ('name', 'user')
 
     def __str__(self):
         return f'{self.user} {self.category_type}: {self.name}'
