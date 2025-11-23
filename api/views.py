@@ -6,7 +6,6 @@ from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import ValidationError
 from django.db import IntegrityError
-
 from .serializers import CategorySerializer
 from .models import *
 # Create your views here.
@@ -42,6 +41,37 @@ class CategoryRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView
 
     def get_queryset(self):
         return Category.objects.filter(user=self.request.user)
+
+    def preform_update(self, serializer):
+        try:
+            serializer.save(user=self.request.user)
+        except IntegrityError:
+            raise ValidationError({'detail': 'خطای دیتابیس هنگام اپدیت دسته'})
+
+    def preform_destroy(self, instance):
+        if instance.transactions.exists():
+            raise ValidationError({'detail':'عدم امکان حذف زیرا تراکنش هایی به آن مرنبط است'})
+        instance.delete()
+
+class TransactionListCreateAPIView(generics.ListAPIView):
+    queryset = Transaction
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Transaction.objects.select_related('category').filter(user=self.request.user)
+
+    def preform_create(self, serializer):
+        try:
+            serializer.save(user=self.request.user)
+        except IntegrityError:
+            raise ValidationError({'detail': 'خطای دیتابیس هنگام اپدیت دسته'})
+
+class TransactionRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Transaction
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Transaction.objects.select_related('category').filter(user=self.request.user)
 
     def preform_update(self, serializer):
         try:
