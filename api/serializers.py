@@ -20,9 +20,9 @@ class CategorySerializer(serializers.ModelSerializer):
         user = getattr(request, 'user', None) #getting user
         query_set = Category.objects.select_related('user').none()
         if user and user.is_authenticated:
-            query_set  = Category.objects.select_related('user').filter(user=user, name=value)
-            if user.instance:
-                if query_set.exclude(pk=self.instance.pk) .exists():
+            query_set = Category.objects.select_related('user').filter(user=user, name=value)
+            if self.instance:
+                if query_set.exclude(pk=self.instance.pk).exists():
                     raise serializers.ValidationError('از قبل دسته ای با این نام دارید!')
         return value
 
@@ -45,6 +45,7 @@ class CategorySerializer(serializers.ModelSerializer):
         except IntegrityError:
             raise serializers.ValidationError({'detail': 'خطای دیتابیس بخاطر رکورد تکراری یا نقض محدودیت '})
         return instance
+
     def update(self, instance, validate_data):
         validate_data.pop('user',None) #Preventing the client from changing the user
         for attr, value in validate_data.items():
@@ -67,3 +68,37 @@ class TransactionSerializer(serializers.ModelSerializer):
     def validate_amount(self, value):
         if value and value < 0:
             raise serializers.ValidationError('مبلع پیش فرض نمیتواند منفی باشد!')
+
+    def validate_category(self, value):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if user and value.user.id != getattr(user, 'id', None):
+            raise serializers.ValidationError('دسته انتخاب شده متعلق به شما نیست')
+        if value is None:
+            raise serializers.ValidationError('دسته ای انتخاب نشده است!')
+        if not value.is_active:
+            raise serializers.ValidationError('نمیتوانید تراکنشی داشته باشید زیرا این دسته غیرفغال است')
+
+    def create(self,validated_data):
+        request = self.context.get('request') #getting request
+        user = getattr(request, 'user', None)
+        vd = validated_data
+        try: # مدیریت خطای دیتابیس هنگام ساخت رکورد جدید
+            instance = Transaction.objects.create(user=user,
+                category=vd['category'],
+                amount=vd['amount'],
+                description=vd['description'],
+                transaction_date=vd['transaction_date'])
+        except IntegrityError:
+            raise serializers.ValidationError({'detail': 'خطای دیتابیس هنگام ثبت تراکنش '})
+        return instance
+
+    def update(self, instance, validated_data):
+        validated_data.pop('user', None) #Preventing the client from changing the user in transactions
+        for attr , value in validated_data.items():
+            setattr(instance, attr, value)
+        try:
+            instance.save()
+        except IntegrityError:
+            raise serializers.ValidationError({'detail': 'خطای دیتابیس هنگام اپدیت تراکنش'})
+
