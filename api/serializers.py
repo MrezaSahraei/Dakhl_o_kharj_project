@@ -102,3 +102,76 @@ class TransactionSerializer(serializers.ModelSerializer):
         except IntegrityError:
             raise serializers.ValidationError({'detail': 'خطای دیتابیس هنگام اپدیت تراکنش'})
 
+class BudgetingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Budgeting
+        fields = [
+            'id','category', 'minimum_target_amount', 'maximum_target_amount',
+            'start_date', 'end_date' , 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate_categoey(self, value):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if user and value.user.id != getattr(user, 'id', None):
+            raise serializers.ValidationError('دسته انتخاب شده متعلق به شما نیست')
+        if value is None:
+            raise serializers.ValidationError('دسته ای انتخاب نشده است!')
+        return value
+
+    def validate(self, data):
+        """
+        General checks: start <= end and min <= max and ensuring non-negative values
+        """
+        def get_final_value(field_name): #for PATCH requests
+            new_value = data.get(field_name)
+
+            if new_value is None and self.instance:
+                return getattr(self.instance, field_name, None)
+            return new_value
+
+        #getting fields from data
+        min_amt = data.get('minimum_target_amount')
+        max_amt = data.get('maximum_target_amount')
+        start = data.get('start_date')
+        end = data.get('end_date')
+
+        if min_amt and max_amt and min_amt > max_amt:
+            raise serializers.ValidationError('حداکثر بودجه تعیین شده نمیتواند کوچکتر از حداقل بودجه تعیین شده باشد ')
+
+        if (min_amt is not None) and min_amt < 0 or (max_amt is not None) and max_amt < 0:
+            raise serializers.ValidationError('مبلع بودجه نمیتواند منفی باشد!')
+
+        if start and end and start > end:
+            raise serializers.ValidationError('تارخ پایان نمیتواند کوچکتر از تاریخ شروع باشد')
+
+        return data
+
+    def create(self, validated_data):
+        request =self.context.get('request')
+        user = getattr(request, 'user', None)
+        vd = validated_data
+        try: # مدیریت خطای دیتابیس هنگام ساخت رکورد جدید
+            instance = Budgeting.objects.create(user=user,
+                category=vd['category'],
+                minimum_target_amount=vd['minimum_target_amount'],
+                maximum_target_amount=vd['maximum_target_amount'],
+                start_date=vd['start_date'], end_date=['end_date'])
+        except IntegrityError:
+            raise serializers.ValidationError({'detail': 'خطای دیتابیس هنگام ثبت بودجه '})
+        return instance
+
+    def update(self, instance, validated_data):
+        validated_data.pop('user', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value )
+        try:
+            instance.save()
+        except IntegrityError:
+            raise serializers.ValidationError({'detail': 'خطای دیتابیس هنگام ثبت بودجه '})
+        return instance
+
+
+
+
