@@ -1,5 +1,6 @@
 from django.core.serializers import serialize
 from django.shortcuts import render
+from pyexpat.errors import messages
 from rest_framework.response import Response
 from rest_framework.views import APIView, status
 from rest_framework import generics
@@ -8,6 +9,8 @@ from rest_framework.exceptions import ValidationError
 from django.db import IntegrityError
 from .serializers import CategorySerializer
 from .models import *
+from django.db.models import Sum, DecimalField
+from datetime import date
 # Create your views here.
 
 '''class CategoryListCreateAPIView(APIView):
@@ -108,4 +111,75 @@ class BudgetingRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIVie
         except IntegrityError:
             raise ValidationError({'detail': 'خطای دیتابیس هنگام اپدیت بودجه'})
 
+class UserBalanceAPIView(APIView):
 
+    def calculate_balance(self, request):
+        user = request.user
+        total_income = (Transaction.objects.select_related('category', 'user').
+                        filter(user=user, category__category_type='income')).aggregate(total=Sum('amount'))['total'] or 0
+
+        total_expense = (Transaction.objects.select_related('category', 'user').
+                        filter(user=user, category__category_type='expense')).aggregate(total=Sum('amount'))['total'] or 0
+
+        final_balance = total_income - total_expense
+
+        return total_income, total_expense, final_balance
+
+    def get(self, request):
+        user = request.user
+        total_income, total_expense, final_balance = self.calculate_balance(user)
+
+        if final_balance < 0:
+            final_balance_display = abs(final_balance)
+            balance_status = 'تراز شما منفی است.'
+        else:
+            final_balance_display = final_balance
+            balance_status = 'تراز شما مثبت است.(میتوانید این مبلغ را در دسته پس انداز بگذارید.)'
+
+        return Response({
+            'total_income': total_income,
+            'total_expense': total_expense,
+            'net_balance': final_balance_display,
+            'balance_status': balance_status
+        })
+
+    #Automatic saving feature
+    def post(self,request):
+        user = request.user
+        total_income, total_expense, final_balance = self.calculate_balance(user)
+
+        confirm_saving = request.data.get('confirm_saving', False)
+        if confirm_saving:
+
+            if final_balance > 0:
+                    saving_category = Category.objects.get(category_type='savings')
+
+                    Transaction.objects.create(
+                        user=user, amount=final_balance, category=saving_category,
+                        description="پس‌انداز خودکار مازاد تراز مالی (ایجاد شده با مجوز کاربر)",
+                        transaction_date=date.today()
+                    )
+                    return Response({
+                        'status': 'success',
+                        'saved_amount': final_balance,
+                        'message': f' ریال به عنوان پس انداز شما با موفقیت ثبت شد{final_balance} مبلغ '
+                    }, status=status.HTTP_201_CREATED)
+
+            elif final_balance == 0:
+                return Response({
+                    'status': 'info',
+                    'message': 'تراز شما 0 است برای پس انداز باید تراز مثبت داشته باشید'
+                }, status=status.HTTP_200_OK)
+
+            else:
+                return Response({
+                    'status': 'info',
+                    'message': 'تراز شما منفی است برای پس انداز باید تراز مثبت داشته باشید'
+
+                }, status=status.HTTP_200_OK)
+
+        else:
+            return Response({
+                "status": "error",
+                "message": "برای ذخیره مازاد باید مجوز پس انداز مازاد تراز مالی را ارسال کنید."
+            }, status=status.HTTP_400_BAD_REQUEST)
