@@ -112,6 +112,7 @@ class BudgetingRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIVie
             raise ValidationError({'detail': 'خطای دیتابیس هنگام اپدیت بودجه'})
 
 class UserBalanceAPIView(APIView):
+    permission_classes = [IsAuthenticated]
 
     def calculate_balance(self, request):
         user = request.user
@@ -126,12 +127,16 @@ class UserBalanceAPIView(APIView):
         return total_income, total_expense, final_balance
 
     def get(self, request):
-        user = request.user
-        total_income, total_expense, final_balance = self.calculate_balance(user)
+        #user = request.user
+        total_income, total_expense, final_balance = self.calculate_balance(request)
 
         if final_balance < 0:
             final_balance_display = abs(final_balance)
             balance_status = 'تراز شما منفی است.'
+
+        elif final_balance == 0:
+            final_balance_display = 0
+            balance_status = 'هزینه های شما با مخارج تان برابر بوده و حسابتان 0 است.'
         else:
             final_balance_display = final_balance
             balance_status = 'تراز شما مثبت است.(میتوانید این مبلغ را در دسته پس انداز بگذارید.)'
@@ -146,9 +151,10 @@ class UserBalanceAPIView(APIView):
     #Automatic saving feature
     def post(self,request):
         user = request.user
-        total_income, total_expense, final_balance = self.calculate_balance(user)
+        total_income, total_expense, final_balance = self.calculate_balance(request)
 
         confirm_saving = request.data.get('confirm_saving', False)
+
         if confirm_saving:
 
             if final_balance > 0:
@@ -157,8 +163,8 @@ class UserBalanceAPIView(APIView):
                     user=user,
                     category_type='savings',
                     defaults={'name': 'پس‌انداز', 'color': 'سبز'})'''
-                saving_category, created = Category.objects.get_or_create(category_type='savings',
-                defaults={'name': 'savings'})
+                saving_category, created = Category.objects.get_or_create(user=user, category_type='savings',
+                defaults={'name': 'پس انداز ', 'color':'سبز'})
 
                 Transaction.objects.create(
                     user=user, amount=final_balance, category=saving_category,
