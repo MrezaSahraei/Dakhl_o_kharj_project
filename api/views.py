@@ -1,13 +1,11 @@
-from django.core.serializers import serialize
 from django.shortcuts import render
-from pyexpat.errors import messages
 from rest_framework.response import Response
 from rest_framework.views import APIView, status
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import ValidationError
 from django.db import IntegrityError
-from .serializers import CategorySerializer
+from .serializers import *
 from .models import *
 from django.db.models import Sum, DecimalField
 from datetime import date
@@ -25,7 +23,7 @@ from datetime import date
             serializer.save(user=request.user)
             return Response(serializer.data, status=status.Http_201_CREATED)'''
 
-class CategoryListCreateAPIView(generics.ListAPIView):
+class CategoryListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = CategorySerializer
     permission_classes = [IsAuthenticated]
 
@@ -58,7 +56,8 @@ class CategoryRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView
             raise ValidationError({'detail':'عدم امکان حذف زیرا بودجه بندی هایی برای ان وجود دارند'})
         instance.delete()
 
-class TransactionListCreateAPIView(generics.ListAPIView):
+class TransactionListCreateAPIView(generics.ListCreateAPIView):
+    serializer_class = TransactionSerializer
     queryset = Transaction
     permission_classes = [IsAuthenticated]
 
@@ -73,6 +72,7 @@ class TransactionListCreateAPIView(generics.ListAPIView):
 
 class TransactionRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Transaction
+    serializer_class = TransactionSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -87,6 +87,8 @@ class TransactionRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIV
 
 class BudgetingListCreateAPIView(generics.ListCreateAPIView):
     queryset = Budgeting
+    serializer_class = BudgetingSerializer
+
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -100,6 +102,7 @@ class BudgetingListCreateAPIView(generics.ListCreateAPIView):
 
 class BudgetingRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Budgeting
+    serializer_class = BudgetingSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):

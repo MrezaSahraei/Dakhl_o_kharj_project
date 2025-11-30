@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from accounts.models import AppUser
 from django.conf import settings
+import datetime
 # Create your models here.
 
 class TimeStamp(models.Model):
@@ -17,7 +18,7 @@ class TimeStamp(models.Model):
 class Category(TimeStamp):
     TYPE_CHOICES = (
         ('income', 'درآمد'),
-        ('expense', 'هزینه ضروری'),
+        ('expense', 'هزینه '),
         ('savings', 'پس‌انداز/سرمایه‌گذاری'),
     )
     COLORS = (
@@ -47,9 +48,10 @@ class Transaction(TimeStamp):
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='transactions')
     amount = models.PositiveIntegerField(default=0, help_text='واحد پیش‌فرض (ریال)')
     description = models.TextField(blank=True, null=True)
-    transaction_date = models.DateTimeField(default=timezone.now)
+    date = models.DateField(default=datetime.datetime.today())
+    record_date = models.DateTimeField(default=datetime.datetime.today())
 
-    class Meta:
+    class Meta(TimeStamp.Meta):
         ordering = ['created_at']
 
     def __str__(self):
