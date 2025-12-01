@@ -221,20 +221,30 @@ class MonthlySummeryAPIView(APIView):
                 {'detail': 'لطفا سال و ماه مورد نظر را مشخص کنید'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        if not 1300 <shamsi_year <1500 or not 1 <= shamsi_month <= 12:
+            return Response(
+                {'detail': 'لطفا سال و ماه معتبر وارد کنید'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
-            shamsi_year = int(shamsi_year)
-            shamsi_month = int(shamsi_month)
+            shamsi_year =int(shamsi_year)
+            shamsi_month =int(shamsi_month)
             start_j_date = jdatetime.date(shamsi_year, shamsi_month, 1)
             start_gregorian_date = start_j_date.togregorian()
-            if shamsi_month <=6:
+
+            if shamsi_month <= 6:
                 end_day = 31
             elif shamsi_month <= 11:
                 end_day = 30
-            elif shamsi_month == 12:
-                end_day = 29
+            else:
+                if jdatetime.date(shamsi_year,1 ,1).isleap():
+                    end_day = 30
+                else:
+                    end_day = 29
 
             end_j_date = jdatetime.date(shamsi_year, shamsi_month, end_day)
+
             end_gregorian_date = end_j_date.togregorian()
 
         except ValueError:
@@ -257,21 +267,26 @@ class MonthlySummeryAPIView(APIView):
         monthly_average_income = monthly_total_income / end_day
         monthly_average_expense = monthly_total_expense / end_day
 
+        month_num = {
+            1:'فروردین', 2: 'اردیبیهشت', 3: 'خرداد', 4: 'تیر', 5: 'مرداد', 6: 'شهریور',
+            7: 'مهر', 8: 'ابان', 9: 'اذر', 10: 'دی', 11: 'بهمن', 12: 'اسفند'
+        }
+
         if monthly_total_expense == 0 and monthly_total_income == 0:
-            message = 'شما در این ماه تراکنشی نداشته اید'
+            message = f' شما تراکنشی در  {month_num[shamsi_month]} {shamsi_year}نداشته اید'
         else:
-            message = ' مجموع تراکنش های شما در این ماه'
+            message = f' مجموع تراکنش های شما در  ماه {month_num[shamsi_month]} {shamsi_year}'
+
         monthly_net_balance = monthly_total_income - monthly_total_expense
 
         return Response({
             'shamsi_year': shamsi_year,
-            'shamsi_month' : shamsi_month,
-            'start_j_date' : start_j_date,
-            'end_j_date' : end_j_date,
+            'shamsi_month': month_num[shamsi_month] ,
             'message': message,
             'total_income_monthly' : monthly_total_income,
             'total_expense_monthly': monthly_total_expense,
             'monthly_average_income': monthly_average_income,
             'monthly_average_expense': monthly_average_expense,
-            'monthly_net_balance': abs(monthly_net_balance)
-        })
+            'monthly_net_balance': monthly_net_balance
+        },status=status.HTTP_200_OK)
+
